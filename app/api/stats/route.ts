@@ -1,273 +1,375 @@
+// app/api/github-stats/route.ts
 import { Octokit } from "octokit";
 
-export const revalidate = 600; // cache 10
+export const revalidate = 600; // 10 minutes
 
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
 const username = process.env.GITHUB_USERNAME;
 
-const query = `
-  query($login: String!, $from: DateTime!, $to: DateTime!) {
+/**
+ * Repo page GraphQL query (fetches stargazers, forks, pushedAt)
+ * - uses 'after' for pagination
+ */
+const REPOS_PAGE_QUERY = `
+  query ($login: String!, $after: String) {
     user(login: $login) {
-      contributionsCollection(from: $from, to: $to) {
-        contributionCalendar {
-          totalContributions
-          weeks {
-            contributionDays {
-              date
-              contributionCount
-            }
-          }
+      repositories(first: 100, ownerAffiliations: OWNER, after: $after) {
+        totalCount
+        nodes {
+          name
+          stargazerCount
+          forkCount
+          pushedAt
         }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }
+      pullRequests {
+        totalCount
+      }
+      issues {
+        totalCount
       }
     }
   }
 `;
 
-async function fetchContributions(username: string, from: Date, to: Date) {
-  const contributions: ContributionDay[] = [];
-  let start = new Date(from);
-  let end = new Date(Math.min(to.getTime(), start.getTime() + 365 * 24 * 60 * 60 * 1000));
+/** Search-commits REST endpoint headers require this Accept preview */
+const COMMITS_SEARCH_ACCEPT = "application/vnd.github.cloak-preview";
 
-  let totalContributions = 0;
+/** Fetch all repository pages and return aggregated data */
+async function fetchAllRepos(login: string) {
+  let after: string | null = null;
+  let done = false;
 
-  while (start.getTime() < to.getTime()) {
-    const variables = { login: username, from: start.toISOString(), to: end.toISOString() };
+  let totalStars = 0;
+  let totalForks = 0;
+  let repoCount = 0;
+  let activeReposLastYear = 0;
+  const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
 
-    const { user } = await octokit.graphql<GitHubUserResponse>(query, variables);
+  // We'll also capture pullRequests and issues counts from first page
+  let totalPRs = 0;
+  let totalIssues = 0;
+  let firstPageCaptured = false;
 
-    // Flatten weeks → contributionDays
-    const days = user.contributionsCollection.contributionCalendar.weeks.flatMap(
-      (w) => w.contributionDays
-    );
+  while (!done) {
+    const vars: { login: string; after?: string } = { login };
+    if (after) vars.after = after;
 
-    contributions.push(...days);
+    const res = await octokit.graphql<ReposPageResponse>(REPOS_PAGE_QUERY, vars);
 
-    // Update total contributions
-    totalContributions += user.contributionsCollection.contributionCalendar.totalContributions;
+    const user = res.user;
+    if (!user) throw new Error("Could not fetch user data from GraphQL");
 
-    // console.log("start", start);
-    // console.log("end", end);
-    // console.log("con", user.contributionsCollection.contributionCalendar.totalContributions, "\n");
+    // capture pr/issue totals from the first page (they are global counts)
+    if (!firstPageCaptured) {
+      totalPRs = user.pullRequests?.totalCount ?? 0;
+      totalIssues = user.issues?.totalCount ?? 0;
+      firstPageCaptured = true;
+    }
 
-    // Move 1 year ahead
-    start = new Date(end.getTime() + 1000); // add 1 second to avoid overlap
-    end = new Date(Math.min(to.getTime(), start.getTime() + 365 * 24 * 60 * 60 * 1000));
+    const repos = user.repositories.nodes ?? [];
+    repoCount = user.repositories.totalCount ?? repoCount;
+
+    for (const node of repos) {
+      totalStars += node.stargazerCount ?? 0;
+      totalForks += node.forkCount ?? 0;
+      if (node.pushedAt) {
+        const pushedAt = new Date(node.pushedAt).getTime();
+        if (pushedAt >= oneYearAgo) activeReposLastYear++;
+      }
+    }
+
+    const pageInfo = user.repositories.pageInfo;
+    if (pageInfo && pageInfo.hasNextPage) {
+      after = pageInfo.endCursor;
+    } else {
+      done = true;
+    }
   }
 
-  return { contributions, totalContributions };
+  return {
+    totalStars,
+    totalForks,
+    repoCount,
+    activeReposLastYear,
+    totalPRs,
+    totalIssues,
+  };
+}
+
+/** Fetch total commits authored by the user using the REST search commits endpoint */
+async function fetchTotalCommitsAllTime(login: string) {
+  if (!login) return 0;
+  // Use search/commits REST endpoint which returns total_count
+  // Important: this endpoint requires the Accept preview header
+  try {
+    const response = await octokit.request("GET /search/commits", {
+      q: `author:${login}`,
+      per_page: 1,
+      headers: {
+        accept: COMMITS_SEARCH_ACCEPT,
+      },
+    });
+    // total_count contains the total matching commits
+    const totalCount = response.data?.total_count ?? 0;
+    return totalCount;
+  } catch (err) {
+    // If the request fails (rate limits or permission) fall back to 0 and log
+    console.error("fetchTotalCommitsAllTime error:", err instanceof Error ? err.message : err);
+    return 0;
+  }
+}
+
+/** Calculates the exponential CDF. */
+function exponentialCDF(x: number): number {
+  return 1 - 2 ** -x;
+}
+
+/** Calculates the log-normal CDF (approximation). */
+function logNormalCDF(x: number): number {
+  return x / (1 + x);
+}
+
+/** Calculates the user's rank based on GitHub contributions. */
+export function calculateRank(params: RankParams): RankResult {
+  const { all_commits, totalCommits, prs, issues, reviews, stars, followers } = params;
+
+  const COMMITS_MEDIAN = all_commits ? 1000 : 250;
+  const COMMITS_WEIGHT = 2;
+
+  const PRS_MEDIAN = 50;
+  const PRS_WEIGHT = 3;
+
+  const ISSUES_MEDIAN = 25;
+  const ISSUES_WEIGHT = 1;
+
+  const REVIEWS_MEDIAN = 2;
+  const REVIEWS_WEIGHT = 1;
+
+  const STARS_MEDIAN = 50;
+  const STARS_WEIGHT = 4;
+
+  const FOLLOWERS_MEDIAN = 10;
+  const FOLLOWERS_WEIGHT = 1;
+
+  const TOTAL_WEIGHT =
+    COMMITS_WEIGHT + PRS_WEIGHT + ISSUES_WEIGHT + REVIEWS_WEIGHT + STARS_WEIGHT + FOLLOWERS_WEIGHT;
+
+  const THRESHOLDS = [1, 12.5, 25, 37.5, 50, 62.5, 75, 87.5, 100];
+  const LEVELS = ["S", "A+", "A", "A-", "B+", "B", "B-", "C+", "C"];
+
+  // Weighted contributions
+  const weightedScore =
+    COMMITS_WEIGHT * exponentialCDF(totalCommits / COMMITS_MEDIAN) +
+    PRS_WEIGHT * exponentialCDF(prs / PRS_MEDIAN) +
+    ISSUES_WEIGHT * exponentialCDF(issues / ISSUES_MEDIAN) +
+    REVIEWS_WEIGHT * exponentialCDF(reviews / REVIEWS_MEDIAN) +
+    STARS_WEIGHT * logNormalCDF(stars / STARS_MEDIAN) +
+    FOLLOWERS_WEIGHT * logNormalCDF(followers / FOLLOWERS_MEDIAN);
+
+  const rank = 1 - weightedScore / TOTAL_WEIGHT;
+
+  // Find the corresponding level
+  const levelIndex = THRESHOLDS.findIndex((t) => rank * 100 <= t);
+  const level = LEVELS[levelIndex] ?? LEVELS[LEVELS.length - 1];
+
+  return { level, percentile: rank * 100 };
+}
+
+/** Fetch total reviews across all repos */
+async function fetchTotalReviewsAllTime(username: string) {
+  let page = 1;
+  let totalReviews = 0;
+
+  while (true) {
+    const { data: repos } = await octokit.rest.repos.listForUser({
+      username,
+      type: "owner",
+      per_page: 100,
+      page,
+    });
+
+    if (repos.length === 0) break;
+
+    for (const repo of repos) {
+      let prPage = 1;
+      while (true) {
+        const { data: prs } = await octokit.rest.pulls.list({
+          owner: username,
+          repo: repo.name,
+          state: "all",
+          per_page: 100,
+          page: prPage,
+        });
+
+        if (prs.length === 0) break;
+
+        for (const pr of prs) {
+          const { data: reviews } = await octokit.rest.pulls.listReviews({
+            owner: username,
+            repo: repo.name,
+            pull_number: pr.number,
+          });
+          totalReviews += reviews.length;
+        }
+        prPage++;
+      }
+    }
+
+    page++;
+  }
+
+  return totalReviews;
+}
+
+/** Fetch total followers */
+async function fetchFollowersCount(username: string) {
+  const { data } = await octokit.rest.users.getByUsername({ username });
+  return data.followers;
 }
 
 export async function GET() {
   try {
-    const joiningYear = parseInt(process.env.GITHUB_JOINING_YEAR || "2023", 10);
-    const from = new Date(`${joiningYear}-01-01T00:00:00Z`);
-    const to = new Date(); // today
     if (!username) throw new Error("Add github username in env.GITHUB_USERNAME");
-    const fetchedData = await fetchContributions(username, from, to);
+    if (!process.env.GITHUB_TOKEN) throw new Error("Add github token in env.GITHUB_TOKEN");
 
-    const days = fetchedData.contributions;
-    const totalContributions = fetchedData.totalContributions;
+    // Fetch paginated repos -> stars, forks, active repos, and get PR/issue totals.
+    const { totalStars, totalForks, repoCount, activeReposLastYear, totalPRs, totalIssues } =
+      await fetchAllRepos(username);
 
-    // Sort ascending by date
-    days.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    // Fetch total commits (REST search)
+    const totalCommits = await fetchTotalCommitsAllTime(username);
+    const totalReviews = await fetchTotalReviewsAllTime(username);
+    const totalFollowers = await fetchFollowersCount(username);
 
-    // --- Compute streaks ---
-    function computeStreaks(days: ContributionDay[]) {
-      let longest = 0;
-      let temp = 0;
+    const calcCircleProg = (v: number) => Math.PI * 80 * (1 - Math.min(Math.max(v, 0), 100) / 100);
 
-      // Longest streak
-      for (let i = 0; i < days.length; i++) {
-        if (days[i].contributionCount > 0) {
-          temp++;
-          if (temp > longest) longest = temp;
-        } else {
-          temp = 0;
-        }
-      }
-
-      // Current streak: count consecutive days from the last active day
-      let current = 0;
-      for (let i = days.length - 1; i >= 0; i--) {
-        if (days[i].contributionCount > 0) current++;
-        else break; // streak broken
-      }
-
-      return { currentStreak: current, longestStreak: longest };
-    }
-
-    const { currentStreak, longestStreak } = computeStreaks(days);
-
-    // --- Find the start and end indices for the longest streak ---
-    let bestStart = -1,
-      bestEnd = -1;
-    {
-      let tempStart = 0,
-        tempLen = 0;
-      for (let i = 0; i < days.length; i++) {
-        if (days[i].contributionCount > 0) {
-          if (tempLen === 0) tempStart = i;
-          tempLen++;
-          if (tempLen > bestEnd - bestStart + 1) {
-            bestStart = tempStart;
-            bestEnd = i;
-          }
-        } else {
-          tempLen = 0;
-        }
-      }
-    }
-
-    // --- Helpers for displaying ranges ---
-    function formatStreakRange(days: ContributionDay[], startIdx: number, endIdx: number) {
-      const start = new Date(days[startIdx].date);
-      const end = new Date(days[endIdx].date);
-      const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
-      return `${start.toLocaleDateString("en-US", opts)} - ${end.toLocaleDateString(
-        "en-US",
-        opts
-      )}`;
-    }
-
-    function formatTotalRange(firstDate: string) {
-      const date = new Date(firstDate);
-      console.log("date", date);
-      return `${date.toLocaleDateString("en-US", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      })} - Present`;
-    }
-
-    // --- Format longest streak range ---
-    const longestRange =
-      bestStart >= 0 && bestEnd >= 0 ? formatStreakRange(days, bestStart, bestEnd) : "";
-
-    // --- Format current streak range ---
-    let currRange = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    if (currentStreak > 0) {
-      const endIdx = days.findIndex((_d, i) => i === days.length - 1); // last day with data
-      const startIdx = endIdx - currentStreak + 1;
-      currRange = formatStreakRange(days, startIdx, endIdx);
-    }
-    // else {
-    //   const lastActive = days.filter((d: any) => d.contributionCount > 0).pop();
-    //   currRange = lastActive
-    //     ? new Date(lastActive.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })
-    //     : "";
-    // }
-
-    // --- Total contribution date range ---
-    const firstActive = days.find((d) => d.contributionCount > 0);
-    const totalRange = firstActive ? formatTotalRange(firstActive.date) : "";
-
-    // // --- Final Output ---
-    // console.log({
-    //   totalContributions,
-    //   currentStreak,
-    //   longestStreak,
-    //   currRange,
-    //   longestRange,
-    //   totalRange,
-    // });
-
-    // Now build the SVG
+    // Build the SVG using the same visual style as your provided card
+    // --- Calculate rank ---
+    const rank = calculateRank({
+      all_commits: true, // or false depending on your logic
+      totalCommits,
+      prs: totalPRs,
+      issues: totalIssues,
+      reviews: totalReviews,
+      stars: totalStars,
+      followers: totalFollowers,
+      repos: repoCount,
+    });
+    const width = 440;
+    const height = 210;
     const svg = `
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="isolation: isolate" viewBox="0 0 495 195" width="495px" height="195px" direction="ltr">
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" fill="none" role="img" aria-labelledby="descId">
+  <title id="titleId">${username}'s GitHub Stats, Rank: ${rank.level}</title>
+  <desc id="descId">Total Stars: ${totalStars}, Forks: ${totalForks}, Commits: ${totalCommits}, PRs: ${totalPRs}, Issues: ${totalIssues}, Active Repos (last year): ${activeReposLastYear}</desc>
   <style>
-    @keyframes currstreak {
-      0% { font-size: 3px; opacity: 0.2; }
-      80% { font-size: 34px; opacity: 1; }
-      100% { font-size: 28px; opacity: 1; }
+    .header {
+      font: 600 18px 'Segoe UI', Ubuntu, Sans-Serif;
+      fill: #a277ff;
+      animation: fadeInAnimation 0.8s ease-in-out forwards;
     }
-    @keyframes fadein {
-      0% { opacity: 0; }
-      100% { opacity: 1; }
+    @supports(-moz-appearance: auto) {
+      .header { font-size: 15.5px; }
+    }
+
+    .stat { font: 600 14px 'Segoe UI', Ubuntu, "Helvetica Neue", Sans-Serif; fill: #61ffca; }
+    @supports(-moz-appearance: auto) { .stat { font-size:12px; } }
+
+    .stagger { opacity: 0; animation: fadeInAnimation 0.3s ease-in-out forwards; }
+
+    .rank-text { font: 800 24px 'Segoe UI', Ubuntu, Sans-Serif; fill: #61ffca; animation: scaleInAnimation 0.3s ease-in-out forwards; }
+
+    .rank-circle-rim { stroke: #a277ff; fill: none; stroke-width: 6; opacity: 0.2; }
+    .rank-circle { stroke: #a277ff; stroke-dasharray: 250; fill: none; stroke-width: 6; stroke-linecap: round; opacity: 0.8; transform-origin: -10px 8px; transform: rotate(-90deg); animation: rankAnimation 1s forwards ease-in-out; }
+
+    @keyframes rankAnimation { 
+      from { stroke-dashoffset: 251.32741228718345; } 
+      to { stroke-dashoffset: 245.21308919715943; } 
+    }
+
+    @keyframes scaleInAnimation { 
+      from { transform: translate(-5px, 5px) scale(0); } 
+      to { transform: translate(-5px, 5px) scale(1); } 
+    }
+    @keyframes fadeInAnimation { 
+      from { opacity: 0; } to { opacity: 1; } 
+    }
+    .bold { font-weight: 700 }
+    @keyframes rankAnimation {
+      from { stroke-dashoffset: ${calcCircleProg(0)}; }
+      to { stroke-dashoffset: ${calcCircleProg(100 - rank.percentile)}; }
     }
   </style>
-  <defs>
-    <clipPath id="outer_rectangle">
-      <rect width="495" height="195" rx="4.5"/>
-    </clipPath>
-    <mask id="mask_out_ring_behind_fire">
-      <rect width="495" height="195" fill="white"/>
-      <ellipse id="mask-ellipse" cx="247.5" cy="32" rx="13" ry="18" fill="black"/>
-    </mask>
-  </defs>
-  <g clip-path="url(#outer_rectangle)">
-    <rect stroke="#000000" stroke-opacity="0" fill="#15141B" rx="4.5" x="0.5" y="0.5" width="494" height="194"/>
 
-    <g>
-      <line x1="165" y1="28" x2="165" y2="170" vector-effect="non-scaling-stroke" stroke-width="1" stroke="#E4E2E2"/>
-      <line x1="330" y1="28" x2="330" y2="170" vector-effect="non-scaling-stroke" stroke-width="1" stroke="#E4E2E2"/>
+  <rect data-testid="card-bg" x="0.5" y="0.5" rx="4.5" height="100%" stroke="#e4e2e2" width="100%" fill="#15141b" stroke-opacity="0"/>
+
+  <g data-testid="card-title" transform="translate(25, 35)">
+    <g transform="translate(0, 0)">
+      <text x="0" y="0" class="header" data-testid="header">${username}'s GitHub Stats</text>
     </g>
-
-    <!-- Total Contributions -->
-    <g>
-      <g transform="translate(82.5, 48)">
-        <text x="0" y="32" text-anchor="middle" fill="#A277FF" font-family="'Segoe UI', Ubuntu, sans-serif" font-weight="700" font-size="28px" style="opacity:0;animation:fadein 0.5s linear forwards 0.6s">
-          ${totalContributions}
-        </text>
-      </g>
-      <g transform="translate(82.5, 84)">
-        <text x="0" y="32" text-anchor="middle" fill="#A277FF" font-family="'Segoe UI', Ubuntu, sans-serif" font-weight="400" font-size="14px" style="opacity:0;animation:fadein 0.5s linear forwards 0.7s">
-          Total Contributions
-        </text>
-      </g>
-      <g transform="translate(82.5, 114)">
-        <text x="0" y="32" text-anchor="middle" fill="#61FFCA" font-family="'Segoe UI', Ubuntu, sans-serif" font-weight="400" font-size="12px" style="opacity:0;animation:fadein 0.5s linear forwards 0.8s">
-          ${totalRange}
-        </text>
-      </g>
-    </g>
-
-    <!-- Current Streak -->
-    <g>
-      <g transform="translate(247.5, 48)">
-        <text x="0" y="32" text-anchor="middle" fill="#FFCA85" font-family="'Segoe UI', Ubuntu, sans-serif" font-weight="700" font-size="28px" style="animation:currstreak 0.6s linear forwards">
-          ${currentStreak}
-        </text>
-      </g>
-      <g transform="translate(247.5, 108)">
-        <text x="0" y="32" text-anchor="middle" fill="#FFCA85" font-family="'Segoe UI', Ubuntu, sans-serif" font-weight="700" font-size="14px" style="opacity:0;animation:fadein 0.5s linear forwards 0.9s">
-          Current Streak
-        </text>
-      </g>
-      <g transform="translate(247.5, 145)">
-        <text x="0" y="21" text-anchor="middle" fill="#61FFCA" font-family="'Segoe UI', Ubuntu, sans-serif" font-weight="400" font-size="12px" style="opacity:0;animation:fadein 0.5s linear forwards 0.9s">
-          ${currRange}
-        </text>
-      </g>
-      <g mask="url(#mask_out_ring_behind_fire)">
-        <circle cx="247.5" cy="71" r="40" fill="none" stroke="#A277FF" stroke-width="5" style="opacity:0;animation:fadein 0.5s linear forwards 0.4s"/>
-      </g>
-      <g transform="translate(247.5, 19.5)" style="opacity:0;animation:fadein 0.5s linear forwards 0.6s">
-        <path d="M -12 -0.5 L 15 -0.5 L 15 23.5 L -12 23.5 L -12 -0.5 Z" fill="none"/>
-        <path d="M 1.5 0.67 C 1.5 0.67 2.24 3.32 2.24 5.47 C 2.24 7.53 0.89 9.2 -1.17 9.2 C -3.23 9.2 -4.79 7.53 -4.79 5.47 L -4.76 5.11 C -6.78 7.51 -8 10.62 -8 13.99 C -8 18.41 -4.42 22 0 22 C 4.42 22 8 18.41 8 13.99 C 8 8.6 5.41 3.79 1.5 0.67 Z M -0.29 19 C -2.07 19 -3.51 17.6 -3.51 15.86 C -3.51 14.24 -2.46 13.1 -0.7 12.74 C 1.07 12.38 2.9 11.53 3.92 10.16 C 4.31 11.45 4.51 12.81 4.51 14.2 C 4.51 16.85 2.36 19 -0.29 19 Z" fill="#A277FF"/>
-      </g>
-    </g>
-
-    <!-- Longest Streak -->
-    <g>
-      <g transform="translate(412.5, 48)">
-        <text x="0" y="32" text-anchor="middle" fill="#A277FF" font-family="'Segoe UI', Ubuntu, sans-serif" font-weight="700" font-size="28px" style="opacity:0;animation:fadein 0.5s linear forwards 1.2s">
-          ${longestStreak}
-        </text>
-      </g>
-      <g transform="translate(412.5, 84)">
-        <text x="0" y="32" text-anchor="middle" fill="#A277FF" font-family="'Segoe UI', Ubuntu, sans-serif" font-weight="400" font-size="14px" style="opacity:0;animation:fadein 0.5s linear forwards 1.3s">
-          Longest Streak
-        </text>
-      </g>
-      <g transform="translate(412.5, 114)">
-        <text x="0" y="32" text-anchor="middle" fill="#61FFCA" font-family="'Segoe UI', Ubuntu, sans-serif" font-weight="400" font-size="12px" style="opacity:0;animation:fadein 0.5s linear forwards 1.4s">
-          ${longestRange}
-        </text>
-      </g>
-    </g>
-
   </g>
-</svg>`;
+
+  <g data-testid="main-card-body" transform="translate(0, 55)">
+    <g data-testid="rank-circle" transform="translate(365, 47.5)">
+      <circle class="rank-circle-rim" cx="-10" cy="8" r="40"/>
+      <circle class="rank-circle" cx="-10" cy="8" r="40"/>
+      <g class="rank-text">
+        <text x="-5" y="3" alignment-baseline="central" dominant-baseline="central" text-anchor="middle" data-testid="level-rank-icon">
+        ${rank.level}
+        </text>
+      </g>
+    </g>
+
+    <svg x="0" y="0">
+      <g transform="translate(0, 0)">
+        <g class="stagger" style="animation-delay: 450ms" transform="translate(25, 0)">
+          <text class="stat bold" y="12.5">Total Stars:</text>
+          <text class="stat bold" x="199.01" y="12.5" data-testid="stars">${totalStars}</text>
+        </g>
+      </g>
+
+      <g transform="translate(0, 25)">
+        <g class="stagger" style="animation-delay: 600ms" transform="translate(25, 0)">
+          <text class="stat bold" y="12.5">Total Forks:</text>
+          <text class="stat bold" x="199.01" y="12.5" data-testid="forks">${totalForks}</text>
+        </g>
+      </g>
+
+      <g transform="translate(0, 50)">
+        <g class="stagger" style="animation-delay: 750ms" transform="translate(25, 0)">
+          <text class="stat bold" y="12.5">Total Commits:</text>
+          <text class="stat bold" x="199.01" y="12.5" data-testid="commits">${totalCommits}</text>
+        </g>
+      </g>
+
+      <g transform="translate(0, 75)">
+        <g class="stagger" style="animation-delay: 900ms" transform="translate(25, 0)">
+          <text class="stat bold" y="12.5">Total PRs:</text>
+          <text class="stat bold" x="199.01" y="12.5" data-testid="prs">${totalPRs}</text>
+        </g>
+      </g>
+
+      <g transform="translate(0, 100)">
+        <g class="stagger" style="animation-delay: 1050ms" transform="translate(25, 0)">
+          <text class="stat bold" y="12.5">Total Issues:</text>
+          <text class="stat bold" x="199.01" y="12.5" data-testid="issues">${totalIssues}</text>
+        </g>
+      </g>
+
+      <g transform="translate(0, 125)">
+        <g class="stagger" style="animation-delay: 1200ms" transform="translate(25, 0)">
+          <text class="stat bold" y="12.5">Active Repos (1y):</text>
+          <text class="stat bold" x="199.01" y="12.5" data-testid="active">${activeReposLastYear}</text>
+        </g>
+      </g>
+    </svg>
+  </g>
+</svg>
+`;
 
     return new Response(svg, {
       headers: {
@@ -276,38 +378,49 @@ export async function GET() {
       },
     });
   } catch (error) {
-    return new Response(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="60"><text x="10" y="35" fill="red">${
-        error instanceof Error ? `Error: ${error.message}` : "Something Wrong!"
-      }</text></svg>`,
-      { headers: { "Content-Type": "image/svg+xml" } }
-    );
+    console.error("GET error:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    const errorSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="450" height="60"><text x="10" y="35" fill="red">Error: ${message}</text></svg>`;
+    return new Response(errorSvg, { headers: { "Content-Type": "image/svg+xml" } });
   }
 }
 
-type ContributionDay = {
-  date: string;
-  contributionCount: number;
+/** Type definitions (for clarity) */
+type RepoNode = {
+  name: string;
+  stargazerCount: number;
+  forkCount: number;
+  pushedAt?: string | null;
 };
 
-type ContributionWeek = {
-  contributionDays: ContributionDay[];
+type RankParams = {
+  all_commits: boolean;
+  totalCommits: number;
+  prs: number;
+  issues: number;
+  reviews: number;
+  stars: number;
+  followers: number;
+  repos?: number; // optional, not used in calculation
 };
 
-type ContributionsCalendar = {
-  totalContributions: number;
-  weeks: ContributionWeek[];
+type RankResult = {
+  level: string;
+  percentile: number;
 };
 
-type ContributionsCollection = {
-  contributionCalendar: ContributionsCalendar;
-};
-
-type GitHubUser = {
-  login: string;
-  contributionsCollection: ContributionsCollection;
-};
-
-type GitHubUserResponse = {
-  user: GitHubUser;
+// --- Type for GraphQL repositories page response ---
+type ReposPageResponse = {
+  user: {
+    repositories: {
+      totalCount: number;
+      nodes: RepoNode[];
+      pageInfo: {
+        hasNextPage: boolean;
+        endCursor: string | null;
+      };
+    };
+    pullRequests: { totalCount: number };
+    issues: { totalCount: number };
+  };
 };
