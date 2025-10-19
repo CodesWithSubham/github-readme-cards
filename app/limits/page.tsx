@@ -7,8 +7,8 @@ async function logRateLimit() {
     const { data } = await octokit.rest.rateLimit.get();
 
     return data;
-  } catch (error: any) {
-    console.error("Error fetching rate limit:", error.message);
+  } catch (error) {
+    console.error("Error fetching rate limit:", error);
   }
 }
 

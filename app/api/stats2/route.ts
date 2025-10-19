@@ -56,10 +56,10 @@ async function fetchAllRepos(login: string) {
   let firstPageCaptured = false;
 
   while (!done) {
-    const vars: any = { login };
+    const vars: { login: string; after?: string } = { login };
     if (after) vars.after = after;
 
-    const res: any = await octokit.graphql(REPOS_PAGE_QUERY, vars);
+    const res = await octokit.graphql<ReposPageResponse>(REPOS_PAGE_QUERY, vars);
 
     const user = res.user;
     if (!user) throw new Error("Could not fetch user data from GraphQL");
@@ -117,9 +117,9 @@ async function fetchTotalCommitsAllTime(login: string) {
     // total_count contains the total matching commits
     const totalCount = response.data?.total_count ?? 0;
     return totalCount;
-  } catch (err: any) {
+  } catch (err) {
     // If the request fails (rate limits or permission) fall back to 0 and log
-    console.error("fetchTotalCommitsAllTime error:", err?.message ?? err);
+    console.error("fetchTotalCommitsAllTime error:", err instanceof Error ? err.message : err);
     return 0;
   }
 }
@@ -377,7 +377,7 @@ export async function GET() {
         "Cache-Control": "s-maxage=600, stale-while-revalidate",
       },
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("GET error:", error);
     const message = error instanceof Error ? error.message : String(error);
     const errorSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="450" height="60"><text x="10" y="35" fill="red">Error: ${message}</text></svg>`;
@@ -407,4 +407,20 @@ type RankParams = {
 type RankResult = {
   level: string;
   percentile: number;
+};
+
+// --- Type for GraphQL repositories page response ---
+type ReposPageResponse = {
+  user: {
+    repositories: {
+      totalCount: number;
+      nodes: RepoNode[];
+      pageInfo: {
+        hasNextPage: boolean;
+        endCursor: string | null;
+      };
+    };
+    pullRequests: { totalCount: number };
+    issues: { totalCount: number };
+  };
 };

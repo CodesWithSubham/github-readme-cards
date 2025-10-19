@@ -37,7 +37,11 @@ async function fetchTopLanguages(username: string) {
   const totals: Record<string, { size: number; color: string }> = {};
 
   while (!done) {
-    const res: any = await octokit.graphql(TOP_LANGUAGES_QUERY, { login: username, after });
+    const res: TopLanguagesResponse = await octokit.graphql<TopLanguagesResponse>(
+      TOP_LANGUAGES_QUERY,
+      { login: username, after }
+    );
+
     const repos = res.user?.repositories?.nodes ?? [];
 
     for (const repo of repos) {
@@ -171,10 +175,33 @@ export async function GET() {
         "Cache-Control": "s-maxage=600, stale-while-revalidate",
       },
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("GET error:", error);
     const message = error instanceof Error ? error.message : String(error);
     const errSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="450" height="60"><text x="10" y="35" fill="red">Error: ${message}</text></svg>`;
     return new Response(errSvg, { headers: { "Content-Type": "image/svg+xml" } });
   }
 }
+
+// --- Type definitions for GraphQL response ---
+type TopLanguagesResponse = {
+  user: {
+    repositories: {
+      nodes: {
+        languages: {
+          edges: {
+            size: number;
+            node: {
+              name: string;
+              color?: string | null;
+            };
+          }[];
+        } | null;
+      }[];
+      pageInfo: {
+        hasNextPage: boolean;
+        endCursor: string | null;
+      };
+    };
+  };
+};
