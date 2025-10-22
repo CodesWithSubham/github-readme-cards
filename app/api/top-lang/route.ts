@@ -91,20 +91,23 @@ export async function GET() {
       .join("\n");
 
     // Split list visually into two columns for names
-    const left = langs.slice(0, 3);
-    const right = langs.slice(3);
+    const [left, right] = langs.reduce<[typeof langs, typeof langs]>(
+      ([l, r], lang, i) => ((i % 2 ? r : l).push(lang), [l, r]),
+      [[], []]
+    );
 
     const leftList = left
       .map(
         (l, i) => `
-  <g transform="translate(0, ${i * 25})">
-    <g class="stagger" style="animation-delay: ${450 + i * 150}ms">
-      <circle cx="5" cy="6" r="5" fill="${l.color}"/>
-      <text data-testid="lang-name" x="15" y="10" class="lang-name">
-        ${l.name} ${l.percent.toFixed(2)}%
-      </text>
-    </g>
-  </g>`
+          <g transform="translate(0, ${i * 25})">
+            <g class="stagger" style="animation-delay: ${450 + i * 150}ms">
+              <circle cx="5" cy="6" r="5" fill="${l.color}"/>
+              <text data-testid="lang-name" x="15" y="10" class="lang-name">
+                ${l.name} ${l.percent.toFixed(2)}%
+              </text>
+            </g>
+          </g>
+        `
       )
       .join("");
 

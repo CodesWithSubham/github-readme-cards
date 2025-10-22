@@ -1,7 +1,8 @@
 import { Octokit } from "octokit";
 
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
-async function logRateLimit() {
+
+const logRateLimit = async () => {
   try {
     // Fetch rate limit info
     const { data } = await octokit.rest.rateLimit.get();
@@ -10,7 +11,9 @@ async function logRateLimit() {
   } catch (error) {
     console.error("Error fetching rate limit:", error);
   }
-}
+};
+
+export const dynamic = "force-dynamic"; // <- ensures SSR
 
 export default async function LimitsPage() {
   const rateLimitData = await logRateLimit();
