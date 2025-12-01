@@ -150,7 +150,7 @@ export async function GET() {
     @keyframes fadeInAnimation { from { opacity: 0; } to { opacity: 1; } }
   </style>
 
-  <rect data-testid="card-bg" x="0.5" y="0.5" rx="4.5" height="99%" width="299" fill="#15141b" stroke="#e4e2e2" stroke-opacity="1"/>
+  <rect data-testid="card-bg" x="0.5" y="0.5" rx="4.5" height="99%" width="299" fill="#15141b" />
 
   <g data-testid="card-title" transform="translate(25, 35)">
     <text class="header" data-testid="header">Most Used Languages</text>
