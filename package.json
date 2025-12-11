@@ -9,7 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "next": "15.5.4",
+    "next": "15.5.7",
     "octokit": "^5.0.3",
     "react": "19.1.0",
     "react-dom": "19.1.0"
