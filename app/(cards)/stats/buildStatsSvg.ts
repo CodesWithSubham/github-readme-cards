@@ -3,7 +3,7 @@ import { colors, ThemeMode } from "@/lib/colors";
 import { Octokit } from "octokit";
 
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
-const username = process.env.GITHUB_USERNAME;
+const username = process.env.NEXT_PUBLIC_GITHUB_USERNAME;
 
 /**
  * Repo page GraphQL query (fetches stargazers, forks, pushedAt)
@@ -236,7 +236,7 @@ export async function buildStatsSvg(mode: ThemeMode) {
   const theme = colors[mode];
 
   try {
-    if (!username) throw new Error("Add github username in env.GITHUB_USERNAME");
+    if (!username) throw new Error("Add github username in env.NEXT_PUBLIC_GITHUB_USERNAME");
     if (!process.env.GITHUB_TOKEN) throw new Error("Add github token in env.GITHUB_TOKEN");
 
     // Fetch paginated repos -> stars, forks, active repos, and get PR/issue totals.

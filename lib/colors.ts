@@ -1,3 +1,5 @@
+// lib/colors.ts
+
 export type ThemeMode = "light" | "dark";
 
 export type CardColors = {

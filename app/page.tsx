@@ -46,7 +46,7 @@ export default function Home() {
         ].map(({ src, w, h, alt }) => (
           <Image
             key={src}
-            src={`/api${src}${theme === "dark" ? "/dark" : ""}`}
+            src={`${src}${theme === "dark" ? "/dark" : ""}`}
             unoptimized
             alt={alt}
             width={w}

@@ -5,7 +5,7 @@ import { Octokit } from "octokit";
 export const revalidate = 600; // cache for 10 minutes
 
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
-const username = process.env.GITHUB_USERNAME;
+const username = process.env.NEXT_PUBLIC_GITHUB_USERNAME;
 
 // GraphQL query for top languages
 const TOP_LANGUAGES_QUERY = `
@@ -74,7 +74,7 @@ export async function buildTopLangSvg(mode: ThemeMode) {
   const theme = colors[mode];
 
   try {
-    if (!username) throw new Error("Missing GITHUB_USERNAME");
+    if (!username) throw new Error("Missing NEXT_PUBLIC_GITHUB_USERNAME");
     if (!process.env.GITHUB_TOKEN) throw new Error("Missing GITHUB_TOKEN");
 
     const langs = await fetchTopLanguages(username);

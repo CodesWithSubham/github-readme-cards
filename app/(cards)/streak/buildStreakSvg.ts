@@ -4,7 +4,7 @@ import { Octokit } from "octokit";
 export const revalidate = 600; // cache 10
 
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
-const username = process.env.GITHUB_USERNAME;
+const username = process.env.NEXT_PUBLIC_GITHUB_USERNAME;
 
 const query = `
   query($login: String!, $from: DateTime!, $to: DateTime!) {
@@ -60,7 +60,7 @@ export async function buildStreakSvg(mode: ThemeMode) {
     const joiningYear = parseInt(process.env.GITHUB_JOINING_YEAR || "2023", 10);
     const from = new Date(`${joiningYear}-01-01T00:00:00Z`);
     const to = new Date(); // today
-    if (!username) throw new Error("Add github username in env.GITHUB_USERNAME");
+    if (!username) throw new Error("Add github username in env.NEXT_PUBLIC_GITHUB_USERNAME");
     const fetchedData = await fetchContributions(username, from, to);
 
     const days = fetchedData.contributions;
