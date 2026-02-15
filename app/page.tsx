@@ -1,25 +1,17 @@
 "use client";
 
+import { useTheme } from "next-themes";
 import Image from "next/image";
-import { useLayoutEffect, useState } from "react";
-
-type Theme = "light" | "dark";
 
 export default function Home() {
-  const [theme, setTheme] = useState<Theme>("light");
-
-  // Detect system theme on first load
-  useLayoutEffect(() => {
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    setTheme(prefersDark ? "dark" : "light");
-  }, []);
+  const { theme, setTheme } = useTheme();
 
   const toggleTheme = () => {
     setTheme((t) => (t === "light" ? "dark" : "light"));
   };
 
   return (
-    <section className="min-h-screen bg-neutral-100 dark:bg-neutral-950 transition-colors">
+    <section>
       <h1 className="text-4xl font-extrabold text-center pt-8 text-neutral-900 dark:text-white">
         Cards Preview
       </h1>
