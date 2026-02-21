@@ -3,30 +3,33 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build --turbopack",
+    "dev": "next dev",
+    "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "check": "pnpm lint && pnpm typecheck"
   },
   "dependencies": {
     "clsx": "^2.1.1",
-    "next": "15.5.7",
+    "next": "16.1.6",
     "next-themes": "^0.4.6",
     "octokit": "^5.0.3",
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
     "react-icons": "5.5.0",
     "tailwind-merge": "3.4.0"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3",
-    "@tailwindcss/postcss": "^4",
+    "@eslint/js": "9.39.3",
+    "@tailwindcss/postcss": "^4.2.0",
     "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
     "eslint": "^9",
-    "eslint-config-next": "15.5.4",
-    "tailwindcss": "^4",
+    "eslint-config-next": "16.1.6",
+    "globals": "17.3.0",
+    "tailwindcss": "^4.2.0",
     "typescript": "^5"
   }
 }

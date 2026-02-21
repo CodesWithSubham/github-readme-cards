@@ -1,25 +1,62 @@
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import { FlatCompat } from "@eslint/eslintrc";
+import eslint from "@eslint/js";
+import globals from "globals";
+import { defineConfig, globalIgnores } from "eslint/config";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import nextVitals from "eslint-config-next/core-web-vitals";
+import nextTs from "eslint-config-next/typescript";
 
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-});
+export default defineConfig([
+  eslint.configs.recommended,
 
-const eslintConfig = [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+  ...nextVitals,
+  ...nextTs,
+
   {
-    ignores: [
-      "node_modules/**",
-      ".next/**",
-      "out/**",
-      "build/**",
-      "next-env.d.ts",
-    ],
-  },
-];
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        ...globals.browser,
+      },
 
-export default eslintConfig;
+      parserOptions: {
+        ecmaVersion: "latest",
+        sourceType: "module",
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+
+    rules: {
+      "no-console": ["warn", { allow: ["info", "warn", "error"] }],
+
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+        },
+      ],
+
+      "@typescript-eslint/no-explicit-any": "warn",
+
+      "@typescript-eslint/consistent-type-imports": [
+        "error",
+        {
+          prefer: "type-imports",
+          fixStyle: "inline-type-imports",
+        },
+      ],
+    },
+  },
+
+  globalIgnores([".next/**", "out/**", "dist/**", "build/**", "node_modules/**", "next-env.d.ts"]),
+  {
+    files: ["*.config.{js,mjs,cjs,ts}", ".*rc.{js,mjs,cjs,ts}"],
+
+    languageOptions: {
+      parserOptions: {
+        projectService: false,
+      },
+    },
+  },
+]);

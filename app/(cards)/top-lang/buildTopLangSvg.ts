@@ -1,5 +1,5 @@
 // app/api/github-top-langs/route.ts
-import { colors, ThemeMode } from "@/lib/colors";
+import { colors, type ThemeMode } from "@/lib/colors";
 import { Octokit } from "octokit";
 
 export const revalidate = 600; // cache for 10 minutes

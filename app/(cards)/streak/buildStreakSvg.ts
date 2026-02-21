@@ -1,4 +1,4 @@
-import { colors, ThemeMode } from "@/lib/colors";
+import { colors, type ThemeMode } from "@/lib/colors";
 import { Octokit } from "octokit";
 
 export const revalidate = 600; // cache 10
@@ -38,7 +38,7 @@ async function fetchContributions(username: string, from: Date, to: Date) {
 
     // Flatten weeks → contributionDays
     const days = user.contributionsCollection.contributionCalendar.weeks.flatMap(
-      (w) => w.contributionDays
+      (w) => w.contributionDays,
     );
 
     contributions.push(...days);
@@ -75,8 +75,8 @@ export async function buildStreakSvg(mode: ThemeMode) {
       let temp = 0;
 
       // Longest streak
-      for (let i = 0; i < days.length; i++) {
-        if (days[i].contributionCount > 0) {
+      for (const day of days) {
+        if (day.contributionCount > 0) {
           temp++;
           if (temp > longest) longest = temp;
         } else {
@@ -87,7 +87,9 @@ export async function buildStreakSvg(mode: ThemeMode) {
       // Current streak: count consecutive days from the last active day
       let current = 0;
       for (let i = days.length - 1; i >= 0; i--) {
-        if (days[i].contributionCount > 0) current++;
+        const day = days[i];
+        if (!day) break;
+        if (day.contributionCount > 0) current++;
         else break; // streak broken
       }
 
@@ -103,7 +105,10 @@ export async function buildStreakSvg(mode: ThemeMode) {
       let tempStart = 0,
         tempLen = 0;
       for (let i = 0; i < days.length; i++) {
-        if (days[i].contributionCount > 0) {
+        const day = days[i];
+        if (!day) continue;
+
+        if (day.contributionCount > 0) {
           if (tempLen === 0) tempStart = i;
           tempLen++;
           if (tempLen > bestEnd - bestStart + 1) {
@@ -118,18 +123,21 @@ export async function buildStreakSvg(mode: ThemeMode) {
 
     // --- Helpers for displaying ranges ---
     function formatStreakRange(days: ContributionDay[], startIdx: number, endIdx: number) {
-      const start = new Date(days[startIdx].date);
-      const end = new Date(days[endIdx].date);
+      const startDay = days[startIdx];
+      const endDay = days[endIdx];
+      if (!startDay || !endDay) return "";
+
+      const start = new Date(startDay.date);
+      const end = new Date(endDay.date);
       const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
       return `${start.toLocaleDateString("en-US", opts)} - ${end.toLocaleDateString(
         "en-US",
-        opts
+        opts,
       )}`;
     }
 
     function formatTotalRange(firstDate: string) {
       const date = new Date(firstDate);
-      console.log("date", date);
       return `${date.toLocaleDateString("en-US", {
         day: "numeric",
         month: "short",
@@ -144,8 +152,8 @@ export async function buildStreakSvg(mode: ThemeMode) {
     // --- Format current streak range ---
     let currRange = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
     if (currentStreak > 0) {
-      const endIdx = days.findIndex((_d, i) => i === days.length - 1); // last day with data
-      const startIdx = endIdx - currentStreak + 1;
+      const endIdx = days.length - 1; // last day with data
+      const startIdx = Math.max(0, endIdx - currentStreak + 1);
       currRange = formatStreakRange(days, startIdx, endIdx);
     }
 
@@ -262,7 +270,7 @@ export async function buildStreakSvg(mode: ThemeMode) {
       `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="60"><text x="10" y="35" fill="red">${
         error instanceof Error ? `Error: ${error.message}` : "Something Wrong!"
       }</text></svg>`,
-      { headers: { "Content-Type": "image/svg+xml" } }
+      { headers: { "Content-Type": "image/svg+xml" } },
     );
   }
 }

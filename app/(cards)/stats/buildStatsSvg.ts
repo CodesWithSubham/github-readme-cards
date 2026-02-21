@@ -1,5 +1,5 @@
 // app/api/github-stats/route.ts
-import { colors, ThemeMode } from "@/lib/colors";
+import { colors, type ThemeMode } from "@/lib/colors";
 import { Octokit } from "octokit";
 
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
@@ -159,7 +159,7 @@ export function calculateRank(params: RankParams): RankResult {
     COMMITS_WEIGHT + PRS_WEIGHT + ISSUES_WEIGHT + REVIEWS_WEIGHT + STARS_WEIGHT + FOLLOWERS_WEIGHT;
 
   const THRESHOLDS = [1, 12.5, 25, 37.5, 50, 62.5, 75, 87.5, 100];
-  const LEVELS = ["S", "A+", "A", "A-", "B+", "B", "B-", "C+", "C"];
+  const LEVELS = ["S", "A+", "A", "A-", "B+", "B", "B-", "C+", "C"] as const;
 
   // Weighted contributions
   const weightedScore =
@@ -174,7 +174,7 @@ export function calculateRank(params: RankParams): RankResult {
 
   // Find the corresponding level
   const levelIndex = THRESHOLDS.findIndex((t) => rank * 100 <= t);
-  const level = LEVELS[levelIndex] ?? LEVELS[LEVELS.length - 1];
+  const level = LEVELS[levelIndex] ?? LEVELS[LEVELS.length - 1] as string;
 
   return { level, percentile: rank * 100 };
 }
