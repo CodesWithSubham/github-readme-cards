@@ -1,10 +1,7 @@
 // app/api/github-top-langs/route.ts
 import { colors, type ThemeMode } from "@/lib/colors";
-import { Octokit } from "octokit";
+import { getOctokit } from "@/lib/octokit";
 
-export const revalidate = 600; // cache for 10 minutes
-
-const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
 const username = process.env.NEXT_PUBLIC_GITHUB_USERNAME;
 
 // GraphQL query for top languages
@@ -33,6 +30,10 @@ const TOP_LANGUAGES_QUERY = `
 `;
 
 async function fetchTopLanguages(username: string) {
+  "use cache";
+
+  const octokit = getOctokit();
+
   let after: string | null = null;
   let done = false;
   const totals: Record<string, { size: number; color: string }> = {};
@@ -40,7 +41,7 @@ async function fetchTopLanguages(username: string) {
   while (!done) {
     const res: TopLanguagesResponse = await octokit.graphql<TopLanguagesResponse>(
       TOP_LANGUAGES_QUERY,
-      { login: username, after }
+      { login: username, after },
     );
 
     const repos = res.user?.repositories?.nodes ?? [];
@@ -96,7 +97,7 @@ export async function buildTopLangSvg(mode: ThemeMode) {
     // Split list visually into two columns for names
     const [left, right] = langs.reduce<[typeof langs, typeof langs]>(
       ([l, r], lang, i) => ((i % 2 ? r : l).push(lang), [l, r]),
-      [[], []]
+      [[], []],
     );
 
     const leftList = left
@@ -110,7 +111,7 @@ export async function buildTopLangSvg(mode: ThemeMode) {
               </text>
             </g>
           </g>
-        `
+        `,
       )
       .join("");
 
@@ -124,7 +125,7 @@ export async function buildTopLangSvg(mode: ThemeMode) {
         ${l.name} ${l.percent.toFixed(2)}%
       </text>
     </g>
-  </g>`
+  </g>`,
       )
       .join("");
 

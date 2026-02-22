@@ -1,9 +1,6 @@
 import { colors, type ThemeMode } from "@/lib/colors";
-import { Octokit } from "octokit";
+import { getOctokit } from "@/lib/octokit";
 
-export const revalidate = 600; // cache 10
-
-const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
 const username = process.env.NEXT_PUBLIC_GITHUB_USERNAME;
 
 const query = `
@@ -25,6 +22,10 @@ const query = `
 `;
 
 async function fetchContributions(username: string, from: Date, to: Date) {
+  "use cache";
+
+  const octokit = getOctokit();
+
   const contributions: ContributionDay[] = [];
   let start = new Date(from);
   let end = new Date(Math.min(to.getTime(), start.getTime() + 365 * 24 * 60 * 60 * 1000));
@@ -59,7 +60,10 @@ export async function buildStreakSvg(mode: ThemeMode) {
   try {
     const joiningYear = parseInt(process.env.GITHUB_JOINING_YEAR || "2023", 10);
     const from = new Date(`${joiningYear}-01-01T00:00:00Z`);
-    const to = new Date(); // today
+    const to = await (async () => {
+      "use cache";
+      return new Date();
+    })(); // today
     if (!username) throw new Error("Add github username in env.NEXT_PUBLIC_GITHUB_USERNAME");
     const fetchedData = await fetchContributions(username, from, to);
 
@@ -70,7 +74,9 @@ export async function buildStreakSvg(mode: ThemeMode) {
     days.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     // --- Compute streaks ---
-    function computeStreaks(days: ContributionDay[]) {
+    async function computeStreaks(days: ContributionDay[]) {
+      "use cache";
+
       let longest = 0;
       let temp = 0;
 
@@ -96,7 +102,7 @@ export async function buildStreakSvg(mode: ThemeMode) {
       return { currentStreak: current, longestStreak: longest };
     }
 
-    const { currentStreak, longestStreak } = computeStreaks(days);
+    const { currentStreak, longestStreak } = await computeStreaks(days);
 
     // --- Find the start and end indices for the longest streak ---
     let bestStart = -1,
@@ -122,7 +128,9 @@ export async function buildStreakSvg(mode: ThemeMode) {
     }
 
     // --- Helpers for displaying ranges ---
-    function formatStreakRange(days: ContributionDay[], startIdx: number, endIdx: number) {
+    async function formatStreakRange(days: ContributionDay[], startIdx: number, endIdx: number) {
+      "use cache";
+
       const startDay = days[startIdx];
       const endDay = days[endIdx];
       if (!startDay || !endDay) return "";
@@ -136,7 +144,9 @@ export async function buildStreakSvg(mode: ThemeMode) {
       )}`;
     }
 
-    function formatTotalRange(firstDate: string) {
+    async function formatTotalRange(firstDate: string) {
+      "use cache";
+
       const date = new Date(firstDate);
       return `${date.toLocaleDateString("en-US", {
         day: "numeric",
@@ -147,19 +157,24 @@ export async function buildStreakSvg(mode: ThemeMode) {
 
     // --- Format longest streak range ---
     const longestRange =
-      bestStart >= 0 && bestEnd >= 0 ? formatStreakRange(days, bestStart, bestEnd) : "";
+      bestStart >= 0 && bestEnd >= 0 ? await formatStreakRange(days, bestStart, bestEnd) : "";
 
     // --- Format current streak range ---
-    let currRange = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    let currRange = await (async () => {
+      "use cache";
+
+      return new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    })(); // default to "Today"
+
     if (currentStreak > 0) {
       const endIdx = days.length - 1; // last day with data
       const startIdx = Math.max(0, endIdx - currentStreak + 1);
-      currRange = formatStreakRange(days, startIdx, endIdx);
+      currRange = await formatStreakRange(days, startIdx, endIdx);
     }
 
     // --- Total contribution date range ---
     const firstActive = days.find((d) => d.contributionCount > 0);
-    const totalRange = firstActive ? formatTotalRange(firstActive.date) : "";
+    const totalRange = firstActive ? await formatTotalRange(firstActive.date) : "";
 
     // Now build the SVG
     const svg = `

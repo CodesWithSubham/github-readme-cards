@@ -1,8 +1,7 @@
 // app/api/github-stats/route.ts
 import { colors, type ThemeMode } from "@/lib/colors";
-import { Octokit } from "octokit";
+import { getOctokit } from "@/lib/octokit";
 
-const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
 const username = process.env.NEXT_PUBLIC_GITHUB_USERNAME;
 
 /**
@@ -40,6 +39,10 @@ const COMMITS_SEARCH_ACCEPT = "application/vnd.github.cloak-preview";
 
 /** Fetch all repository pages and return aggregated data */
 async function fetchAllRepos(login: string) {
+  "use cache";
+
+  const octokit = getOctokit();
+
   let after: string | null = null;
   let done = false;
 
@@ -102,6 +105,10 @@ async function fetchAllRepos(login: string) {
 
 /** Fetch total commits authored by the user using the REST search commits endpoint */
 async function fetchTotalCommitsAllTime(login: string) {
+  "use cache";
+
+  const octokit = getOctokit();
+
   if (!login) return 0;
   // Use search/commits REST endpoint which returns total_count
   // Important: this endpoint requires the Accept preview header
@@ -134,7 +141,9 @@ function logNormalCDF(x: number): number {
 }
 
 /** Calculates the user's rank based on GitHub contributions. */
-export function calculateRank(params: RankParams): RankResult {
+export async function calculateRank(params: RankParams): Promise<RankResult> {
+  "use cache";
+
   const { all_commits, totalCommits, prs, issues, reviews, stars, followers } = params;
 
   const COMMITS_MEDIAN = all_commits ? 1000 : 250;
@@ -174,13 +183,17 @@ export function calculateRank(params: RankParams): RankResult {
 
   // Find the corresponding level
   const levelIndex = THRESHOLDS.findIndex((t) => rank * 100 <= t);
-  const level = LEVELS[levelIndex] ?? LEVELS[LEVELS.length - 1] as string;
+  const level = LEVELS[levelIndex] ?? (LEVELS[LEVELS.length - 1] as string);
 
   return { level, percentile: rank * 100 };
 }
 
 /** Fetch total reviews across all repos */
 async function fetchTotalReviewsAllTime(username: string) {
+  "use cache";
+
+  const octokit = getOctokit();
+
   let page = 1;
   let totalReviews = 0;
 
@@ -227,6 +240,10 @@ async function fetchTotalReviewsAllTime(username: string) {
 
 /** Fetch total followers */
 async function fetchFollowersCount(username: string) {
+  "use cache";
+
+  const octokit = getOctokit();
+
   const { data } = await octokit.rest.users.getByUsername({ username });
   return data.followers;
 }
@@ -252,7 +269,7 @@ export async function buildStatsSvg(mode: ThemeMode) {
 
     // Build the SVG using the same visual style as your provided card
     // --- Calculate rank ---
-    const rank = calculateRank({
+    const rank = await calculateRank({
       all_commits: true, // or false depending on your logic
       totalCommits,
       prs: totalPRs,
@@ -311,9 +328,7 @@ export async function buildStatsSvg(mode: ThemeMode) {
     }
   </style>
 
-  <rect data-testid="card-bg" x="0.5" y="0.5" rx="7" height="99%" width="99%" fill="${
-    theme.bg
-  }" />
+  <rect data-testid="card-bg" x="0.5" y="0.5" rx="7" height="99%" width="99%" fill="${theme.bg}" />
 
   <g data-testid="card-title" transform="translate(25, 35)">
     <g transform="translate(0, 0)">

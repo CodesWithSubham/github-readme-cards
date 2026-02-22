@@ -1,3 +1,4 @@
+import { cacheLife } from "next/cache";
 import { Octokit } from "octokit";
 
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
@@ -13,9 +14,10 @@ const logRateLimit = async () => {
   }
 };
 
-export const dynamic = "force-dynamic"; // <- ensures SSR
-
 export default async function LimitsPage() {
+  "use cache";
+  cacheLife("minutes");
+  
   const rateLimitData = await logRateLimit();
   return (
     <>
