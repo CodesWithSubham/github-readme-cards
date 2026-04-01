@@ -1,9 +1,12 @@
 import z from "zod";
 import { themeNames } from "../themes/themeNames";
+import { booleanParam } from "./boolean-param";
+import { cardFormats } from "../const";
+import { supportedLocales } from "../i18n";
 
 export const streakQuerySchema = z.object({
   theme: z.enum(themeNames).default("default"),
-  format: z.enum(["svg", "png", "json", "markdown", "text"]).default("svg"),
-  locale: z.enum(["en", "bn", "hi"]).default("en"),
-  border: z.boolean().default(true),
+  format: z.enum(cardFormats).default("svg"),
+  locale: z.enum(supportedLocales).default("en"),
+  border: booleanParam.default(true),
 });

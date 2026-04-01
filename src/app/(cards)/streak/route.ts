@@ -1,5 +1,5 @@
 import { cacheControl } from "@/lib/cache-control";
-import { getStreakStats } from "@/lib/github/streak-stats";
+import { getStreakData } from "@/lib/github/streak-stats";
 import { errorSvg } from "@/lib/renderers/error";
 import { renderStreakCard, renderStreakMarkdown } from "@/lib/renderers/streak-card";
 import { streakQuerySchema } from "@/lib/schemas/streak.schema";
@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   try {
     const query = streakQuerySchema.parse(Object.fromEntries(req.nextUrl.searchParams));
     const { theme: themeName, format, locale, border } = query;
-    const stats = await getStreakStats();
+    const stats = await getStreakData();
 
     if (format === "json") return Response.json(stats, { headers: cacheControl });
 

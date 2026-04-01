@@ -1,23 +1,7 @@
 import { formatDate, formatShortDate } from "@/utils/format-date";
 import { ENV } from "../env";
 import { getOctokit } from "../octokit";
-import type { StreakStats } from "./types";
-
-type ContributionDay = {
-  date: string;
-  contributionCount: number;
-};
-
-type GitHubUserResponse = {
-  user: {
-    contributionsCollection: {
-      contributionCalendar: {
-        totalContributions: number;
-        weeks: { contributionDays: ContributionDay[] }[];
-      };
-    };
-  };
-};
+import type { OctokitStreakResponse, StreakContributionDay, StreakData } from "./types";
 
 const CONTRIBUTIONS_QUERY = `
   query($login: String!, $from: DateTime!, $to: DateTime!) {
@@ -37,7 +21,7 @@ const CONTRIBUTIONS_QUERY = `
   }
 `;
 
-export async function getStreakStats(): Promise<StreakStats> {
+export async function getStreakData(): Promise<StreakData> {
   "use cache";
 
   const username = ENV.NEXT_PUBLIC_GITHUB_USERNAME;
@@ -45,14 +29,14 @@ export async function getStreakStats(): Promise<StreakStats> {
 
   const from = new Date(`${year}-01-01T00:00:00Z`);
   const to = new Date();
-  const allDays: ContributionDay[] = [];
+  const allDays: StreakContributionDay[] = [];
   let totalContributions = 0;
 
   let start = new Date(from);
   while (start < to) {
     const end = new Date(Math.min(to.getTime(), start.getTime() + 365 * 24 * 60 * 60 * 1000));
     const octokit = getOctokit();
-    const { user } = await octokit.graphql<GitHubUserResponse>(CONTRIBUTIONS_QUERY, {
+    const { user } = await octokit.graphql<OctokitStreakResponse>(CONTRIBUTIONS_QUERY, {
       login: username,
       from: start.toISOString(),
       to: end.toISOString(),
