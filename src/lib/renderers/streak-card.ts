@@ -1,9 +1,9 @@
 import type { CardColors } from "../themes/types";
 import { translate, type Locale } from "../i18n";
-import type { StreakStats } from "../github/types";
+import type { StreakData } from "../github/types";
 
 export async function renderStreakCard(
-  stats: StreakStats,
+  data: StreakData,
   theme: CardColors,
   opts: { border?: boolean; locale?: Locale } = {},
 ): Promise<string> {
@@ -39,17 +39,17 @@ export async function renderStreakCard(
         font-family="'Segoe UI', Ubuntu, sans-serif" font-weight="700" 
         font-size="28px" style="opacity:0;animation:fadein 0.5s linear forwards 0.6s"
       >
-        ${stats.totalContributions.toLocaleString()}
+        ${data.totalContributions.toLocaleString()}
       </text>
       <text x="82.5" y="116" text-anchor="middle" fill="${theme.primary}" font-family="'Segoe UI', Ubuntu, sans-serif" font-weight="400" font-size="14px" style="opacity:0;animation:fadein 0.5s linear forwards 0.7s">${totalContributionsText}</text>
-      <text x="82.5" y="146" text-anchor="middle" fill="${theme.secondary}" font-family="'Segoe UI', Ubuntu, sans-serif" font-weight="400" font-size="12px" style="opacity:0;animation:fadein 0.5s linear forwards 0.8s">${stats.totalRange}</text>
+      <text x="82.5" y="146" text-anchor="middle" fill="${theme.secondary}" font-family="'Segoe UI', Ubuntu, sans-serif" font-weight="400" font-size="12px" style="opacity:0;animation:fadein 0.5s linear forwards 0.8s">${data.totalRange}</text>
     </g>
 
     <!-- Current Streak -->
     <g>
-      <text x="247.5" y="80" text-anchor="middle" fill="${theme.accent}" font-family="'Segoe UI', Ubuntu, sans-serif" font-weight="700" font-size="28px" style="animation:currstreak 0.6s linear forwards">${stats.currentStreak}</text>
+      <text x="247.5" y="80" text-anchor="middle" fill="${theme.accent}" font-family="'Segoe UI', Ubuntu, sans-serif" font-weight="700" font-size="28px" style="animation:currstreak 0.6s linear forwards">${data.currentStreak}</text>
       <text x="247.5" y="140" text-anchor="middle" fill="${theme.accent}" font-family="'Segoe UI', Ubuntu, sans-serif" font-weight="700" font-size="14px" style="opacity:0;animation:fadein 0.5s linear forwards 0.9s">${currentStreakText}</text>
-      <text x="247.5" y="166" text-anchor="middle" fill="${theme.secondary}" font-family="'Segoe UI', Ubuntu, sans-serif" font-weight="400" font-size="12px" style="opacity:0;animation:fadein 0.5s linear forwards 0.9s">${stats.currentStreakStart} - ${stats.currentStreakEnd}</text>
+      <text x="247.5" y="166" text-anchor="middle" fill="${theme.secondary}" font-family="'Segoe UI', Ubuntu, sans-serif" font-weight="400" font-size="12px" style="opacity:0;animation:fadein 0.5s linear forwards 0.9s">${data.currentStreakStart} - ${data.currentStreakEnd}</text>
       <g mask="url(#mask_out_ring_behind_fire)">
         <circle cx="247.5" cy="71" r="40" fill="none" stroke="${theme.primary}" stroke-width="5" style="opacity:0;animation:fadein 0.5s linear forwards 0.4s"/>
       </g>
@@ -61,22 +61,22 @@ export async function renderStreakCard(
 
     <!-- Longest Streak -->
     <g>
-      <text x="412.5" y="80" text-anchor="middle" fill="${theme.primary}" font-family="'Segoe UI', Ubuntu, sans-serif" font-weight="700" font-size="28px" style="opacity:0;animation:fadein 0.5s linear forwards 1.2s">${stats.longestStreak}</text>
+      <text x="412.5" y="80" text-anchor="middle" fill="${theme.primary}" font-family="'Segoe UI', Ubuntu, sans-serif" font-weight="700" font-size="28px" style="opacity:0;animation:fadein 0.5s linear forwards 1.2s">${data.longestStreak}</text>
       <text x="412.5" y="116" text-anchor="middle" fill="${theme.primary}" font-family="'Segoe UI', Ubuntu, sans-serif" font-weight="400" font-size="14px" style="opacity:0;animation:fadein 0.5s linear forwards 1.3s">${longestStreakText}</text>
-      <text x="412.5" y="146" text-anchor="middle" fill="${theme.secondary}" font-family="'Segoe UI', Ubuntu, sans-serif" font-weight="400" font-size="12px" style="opacity:0;animation:fadein 0.5s linear forwards 1.4s">${stats.longestStreakStart} - ${stats.longestStreakEnd}</text>
+      <text x="412.5" y="146" text-anchor="middle" fill="${theme.secondary}" font-family="'Segoe UI', Ubuntu, sans-serif" font-weight="400" font-size="12px" style="opacity:0;animation:fadein 0.5s linear forwards 1.4s">${data.longestStreakStart} - ${data.longestStreakEnd}</text>
     </g>
   </g>
 </svg>`;
 }
 
-export async function renderStreakMarkdown(stats: StreakStats): Promise<string> {
+export async function renderStreakMarkdown(data: StreakData): Promise<string> {
   return `## 🔥 Streak
 
 |  | Count | Range |
 |--|-------|-------|
-| 🔥 Current Streak | **${stats.currentStreak} days** | ${stats.currentStreakStart} - ${stats.currentStreakEnd} |
-| ⚡ Longest Streak | **${stats.longestStreak} days** | ${stats.longestStreakStart} - ${stats.longestStreakEnd} |
-| 📊 Total Contributions | **${stats.totalContributions.toLocaleString()}** | ${stats.totalRange} |
+| 🔥 Current Streak | **${data.currentStreak} days** | ${data.currentStreakStart} - ${data.currentStreakEnd} |
+| ⚡ Longest Streak | **${data.longestStreak} days** | ${data.longestStreakStart} - ${data.longestStreakEnd} |
+| 📊 Total Contributions | **${data.totalContributions.toLocaleString()}** | ${data.totalRange} |
 
-*Last updated: ${new Date(stats.fetchedAt).toLocaleDateString()}*`;
+*Last updated: ${new Date(data.fetchedAt).toLocaleDateString()}*`;
 }
