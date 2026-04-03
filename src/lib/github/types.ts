@@ -90,3 +90,25 @@ export type StatsData = {
   rank: RankResult;
   fetchedAt: string;
 };
+
+// =============<[ Top Languages ]>=============
+
+export type OctokitTopLanguagesResponse = {
+  user: {
+    repositories: {
+      nodes: {
+        languages: {
+          edges: { size: number; node: { name: string; color?: string | null } }[];
+        } | null;
+      }[];
+      pageInfo: { hasNextPage: boolean; endCursor: string | null };
+    };
+  };
+};
+
+export type TopLanguagesData = {
+  name: string;
+  color: string;
+  percent: number;
+  bytes: number;
+};
