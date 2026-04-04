@@ -4,7 +4,7 @@ import { useTheme } from "next-themes";
 import Image from "next/image";
 
 export default function Home() {
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme: theme, setTheme } = useTheme();
 
   const toggleTheme = () => {
     setTheme((t) => (t === "light" ? "dark" : "light"));
@@ -38,7 +38,7 @@ export default function Home() {
         ].map(({ src, w, h, alt }) => (
           <Image
             key={src}
-            src={`${src}${theme === "dark" ? "/dark" : ""}`}
+            src={`${src}${theme === "dark" ? `?theme=github_dark` : ""}`}
             unoptimized
             alt={alt}
             width={w}

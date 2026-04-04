@@ -7,6 +7,7 @@ import { FaGithub } from "react-icons/fa";
 import { HiMenuAlt3, HiX } from "react-icons/hi";
 
 import { cn } from "@/utils/cn";
+import { version } from "../../package.json";
 
 const navLinks = [{ href: "/", label: "Home" }];
 
@@ -117,7 +118,7 @@ function Logo() {
       <span className="text-lg font-extrabold">README Cards</span>
 
       <span className="rounded-sm bg-cyan-500/20 px-1.5 py-0.5 font-mono text-xs text-cyan-600 dark:text-cyan-400">
-        v2
+        v{version}
       </span>
     </div>
   );
