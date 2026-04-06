@@ -4,10 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { FaGithub } from "react-icons/fa";
-import { HiMenuAlt3, HiX } from "react-icons/hi";
+import { HiMenuAlt3, HiMoon, HiSun, HiX } from "react-icons/hi";
+import { useTheme } from "next-themes";
 
 import { cn } from "@/utils/cn";
 import { version } from "../../package.json";
+import { useIsClient } from "@/hooks/useIsClient";
 
 const navLinks = [{ href: "/", label: "Home" }];
 
@@ -25,11 +27,13 @@ export default function Header() {
             {/* Desktop links */}
             <div className="mr-2 hidden items-center gap-0.5 md:flex">
               {navLinks.map((link) => (
-                <NavLink key={link.href} active={pathname === link.href} href={link.href}>
+                <NavLink key={link.href} href={link.href}>
                   {link.label}
                 </NavLink>
               ))}
             </div>
+
+            <ThemeToggle />
 
             <NavIcon
               aria-label="Toggle menu"
@@ -144,11 +148,13 @@ function NavIcon({ children, className, ...props }: NavIconProps) {
 
 interface NavLinkProps {
   href: string;
-  active: boolean;
   children: React.ReactNode;
 }
 
-function NavLink({ href, active, children }: NavLinkProps) {
+function NavLink({ href, children }: NavLinkProps) {
+  const pathname = usePathname();
+  const active = pathname === href;
+
   return (
     <Link className="relative rounded-xl px-3.5 py-2" href={href}>
       <span
@@ -161,5 +167,25 @@ function NavLink({ href, active, children }: NavLinkProps) {
       </span>
       {active ? <div className="absolute inset-0 rounded-xl bg-cyan-500/12" /> : null}
     </Link>
+  );
+}
+
+function ThemeToggle() {
+  const { resolvedTheme, setTheme } = useTheme();
+  const isClient = useIsClient();
+
+  if (!isClient) {
+    return <div className="size-8" />;
+  }
+
+  return (
+    <NavIcon
+      aria-label="Toggle theme"
+      onClick={() => {
+        setTheme(resolvedTheme === "dark" ? "light" : "dark");
+      }}
+    >
+      {resolvedTheme === "dark" ? <HiSun size={18} /> : <HiMoon size={18} />}
+    </NavIcon>
   );
 }

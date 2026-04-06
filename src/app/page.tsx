@@ -4,30 +4,13 @@ import { useTheme } from "next-themes";
 import Image from "next/image";
 
 export default function Home() {
-  const { resolvedTheme: theme, setTheme } = useTheme();
-
-  const toggleTheme = () => {
-    setTheme((t) => (t === "light" ? "dark" : "light"));
-  };
+  const { resolvedTheme: theme } = useTheme();
 
   return (
     <section>
       <h1 className="text-4xl font-extrabold text-center pt-8 text-neutral-900 dark:text-white">
         Cards Preview
       </h1>
-
-      {/* Theme Toggle */}
-      <div className="flex justify-center mt-4">
-        <button
-          onClick={toggleTheme}
-          className="px-5 py-2 rounded-lg font-semibold
-            bg-neutral-900 text-white
-            dark:bg-white dark:text-black
-            transition-all"
-        >
-          Switch to {theme === "light" ? "Dark" : "Light"} Mode
-        </button>
-      </div>
 
       {/* Cards */}
       <div className="mt-8 flex flex-wrap justify-center gap-5 *:max-w-md">
