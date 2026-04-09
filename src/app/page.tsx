@@ -18,6 +18,7 @@ export default function Home() {
           { src: "/stats", w: 440, h: 210, alt: "GitHub Stats" },
           { src: "/streak", w: 440, h: 210, alt: "GitHub Streak" },
           { src: "/top-lang", w: 300, h: 160, alt: "Top Languages" },
+          { src: "/achievements", w: 380, h: 230, alt: "GitHub Achievements" },
         ].map(({ src, w, h, alt }) => (
           <Image
             key={src}
