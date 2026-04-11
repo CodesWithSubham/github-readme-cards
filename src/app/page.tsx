@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { useTheme } from "next-themes";
 import Image from "next/image";
+import { SECTION_DEFS } from "@/lib/workflow/markers";
 
 export default function Home() {
   const { resolvedTheme: theme } = useTheme();
   const [tab, setTab] = useState<"preview" | "workflow">("preview");
+  const [selectedSections, setSelectedSections] = useState<string[]>(["stats", "streak", "top-lang"]);
 
   return (
     <section className="max-w-6xl mx-auto px-4 py-8">
@@ -60,8 +62,69 @@ export default function Home() {
           </div>
         </div>
       ) : (
-        <div className="text-center text-neutral-500 dark:text-neutral-400 py-12">
-          <p>Coming Soon</p>
+        <div className="max-w-md mx-auto bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 shadow-sm">
+          <h2 className="text-xl font-bold text-neutral-900 dark:text-white mb-2 flex items-center gap-2">
+            📋 Select Card Sections
+          </h2>
+          <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-6">
+            Choose which stats cards you want to automatically update in your README.
+          </p>
+
+          <div className="flex flex-col gap-3">
+            {Object.entries(SECTION_DEFS).map(([id, def]) => {
+              const isSelected = selectedSections.includes(id);
+              return (
+                <button
+                  key={id}
+                  onClick={() => {
+                    setSelectedSections((prev) =>
+                      prev.includes(id)
+                        ? prev.filter((x) => x !== id)
+                        : [...prev, id]
+                    );
+                  }}
+                  className={`flex items-start gap-4 p-4 rounded-xl border text-left transition ${
+                    isSelected
+                      ? "border-neutral-950 dark:border-white bg-neutral-50 dark:bg-neutral-950/40"
+                      : "border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-950/40"
+                  }`}
+                >
+                  <div
+                    className={`w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 mt-0.5 transition ${
+                      isSelected
+                        ? "bg-neutral-900 border-neutral-900 text-white dark:bg-white dark:border-white dark:text-neutral-900"
+                        : "border-neutral-300 dark:border-neutral-700"
+                    }`}
+                  >
+                    {isSelected && (
+                      <svg
+                        className="w-3.5 h-3.5 stroke-[3]"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M4.5 12.75l6 6 9-13.5"
+                        />
+                      </svg>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="font-bold text-neutral-900 dark:text-white text-sm flex items-center gap-1.5">
+                      <span>{def.icon}</span>
+                      <span>{def.label}</span>
+                    </div>
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 leading-relaxed">
+                      {def.description}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
     </section>
