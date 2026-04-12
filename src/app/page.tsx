@@ -4,11 +4,17 @@ import { useState } from "react";
 import { useTheme } from "next-themes";
 import Image from "next/image";
 import { SECTION_DEFS } from "@/lib/workflow/markers";
+import { CRON_PRESETS } from "@/lib/workflow/generator";
 
 export default function Home() {
   const { resolvedTheme: theme } = useTheme();
   const [tab, setTab] = useState<"preview" | "workflow">("preview");
   const [selectedSections, setSelectedSections] = useState<string[]>(["stats", "streak", "top-lang"]);
+  const [baseUrl, setBaseUrl] = useState(() =>
+    typeof window !== "undefined" ? window.location.origin : ""
+  );
+  const [readmeFile, setReadmeFile] = useState("README.md");
+  const [schedule, setSchedule] = useState<string>("0 * * * *");
 
   return (
     <section className="max-w-6xl mx-auto px-4 py-8">
@@ -124,6 +130,61 @@ export default function Home() {
                 </button>
               );
             })}
+          </div>
+
+          {/* Configuration Fields */}
+          <div className="mt-6 pt-6 border-t border-neutral-200 dark:border-neutral-800 flex flex-col gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-2">
+                🔗 Vercel Base URL
+              </label>
+              <input
+                type="url"
+                value={baseUrl}
+                onChange={(e) => setBaseUrl(e.target.value)}
+                placeholder="https://your-cards.vercel.app"
+                className="w-full px-4 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950/40 text-neutral-900 dark:text-white text-sm outline-none transition focus:border-neutral-900 dark:focus:border-white"
+              />
+              <p className="text-xs text-neutral-400 dark:text-neutral-500 mt-1.5 leading-relaxed">
+                The deployed URL of your github-readme-cards application.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-2">
+                📄 README Filename
+              </label>
+              <input
+                type="text"
+                value={readmeFile}
+                onChange={(e) => setReadmeFile(e.target.value)}
+                placeholder="README.md"
+                className="w-full px-4 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950/40 text-neutral-900 dark:text-white text-sm outline-none transition focus:border-neutral-900 dark:focus:border-white"
+              />
+              <p className="text-xs text-neutral-400 dark:text-neutral-500 mt-1.5 leading-relaxed">
+                The name of the markdown file in your repository where cards will be injected.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-2">
+                ⏰ Update Schedule
+              </label>
+              <select
+                value={schedule}
+                onChange={(e) => setSchedule(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950/40 text-neutral-900 dark:text-white text-sm outline-none transition focus:border-neutral-900 dark:focus:border-white cursor-pointer"
+              >
+                {CRON_PRESETS.map((preset) => (
+                  <option key={preset.value} value={preset.value} className="bg-white dark:bg-neutral-900">
+                    {preset.label} ({preset.value})
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-neutral-400 dark:text-neutral-500 mt-1.5 leading-relaxed">
+                How often GitHub Actions will run to fetch new stats.
+              </p>
+            </div>
           </div>
         </div>
       )}
