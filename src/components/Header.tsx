@@ -11,7 +11,11 @@ import { cn } from "@/utils/cn";
 import { version } from "../../package.json";
 import { useIsClient } from "@/hooks/useIsClient";
 
-const navLinks = [{ href: "/", label: "Home" }];
+const navLinks = [
+  { href: "/", label: "Home" },
+  { href: "/card-preview", label: "Cards Preview" },
+  { href: "/workflow-generator", label: "Workflow Setup" },
+];
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false);
