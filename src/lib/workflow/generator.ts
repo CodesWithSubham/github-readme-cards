@@ -47,7 +47,7 @@ export function generateWorkflowYaml(cfg: WorkflowConfig): string {
     .map((id) => {
       const def = SECTION_DEFS[id];
       if (!def) return "";
-      const url = `${base}${def.apiPath}?format=markdown&theme=${themeName}&locale=${locale}`;
+      const url = `${base}${def.apiPath}?format=markdown&locale=${locale}`;
       const envKey = `CONTENT_${id.toUpperCase().replace(/-/g, "_")}`;
       return `          ${envKey}="$(curl -sf '${url}' || echo 'FETCH_FAILED')"`;
     })
