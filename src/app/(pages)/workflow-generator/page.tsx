@@ -142,7 +142,7 @@ export default function WorkflowGeneratorPage() {
           { n: 1, l: "Choose Sections" },
           { n: 2, l: "Configure" },
           { n: 3, l: "Download" },
-        ].map((s, i) => {
+        ].map((s) => {
           const isAccessible =
             s.n < step ||
             (s.n === 2 && selectedSections.length > 0) ||
@@ -429,7 +429,7 @@ export default function WorkflowGeneratorPage() {
                   t: "Marker verification check",
                   d: "On every run, the workflow verifies if all selected GRC:... markers exist. If any marker is missing, the run will gracefully fail and display annotations in GitHub pointing out what is missing.",
                 },
-              ].map((s, idx) => (
+              ].map((s) => (
                 <div
                   key={s.n}
                   className="flex gap-4 py-4 border-b border-neutral-100 dark:border-neutral-800 last:border-b-0"

@@ -35,7 +35,6 @@ export function generateWorkflowYaml(cfg: WorkflowConfig): string {
     sections,
     schedule,
     baseUrl,
-    themeName = "github_dark",
     locale = "en",
     readmeFile = "README.md",
   } = cfg;
