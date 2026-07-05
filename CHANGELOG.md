@@ -24,9 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * **workflow:** add workflow setup layout and section definitions ([efa96e3](https://github.com/CodesWithSubham/github-readme-cards/commit/efa96e345a0b2ea113900d98f027cf99bfec0a08))
 * **workflow:** add YAML workflow generator and download API ([d27861d](https://github.com/CodesWithSubham/github-readme-cards/commit/d27861d87cee1360581b1498350117ebf3a980b4))
 
-## [0.1.0] - 2026-07-05
+# 0.1.0 (2026-07-05)
 
-### Added
-- Initial project setup with Next.js 16 and Tailwind CSS.
-- Core card components: GitHub Stats, Contribution Streak, and Top Languages.
-- Query parameters validation schemas with Zod.
+
+### Features
+
+* **setup:** Initial project setup with Next.js 16 and Tailwind CSS.
+* **cards:** Core card components: GitHub Stats, Contribution Streak, and Top Languages.
+* **validation:** Query parameters validation schemas with Zod.
